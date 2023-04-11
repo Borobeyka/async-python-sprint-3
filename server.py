@@ -72,7 +72,7 @@ class Server:
                     if not self.isLogged(user):
                         await self.login(user, nickname, password)
                 case COMMANDS.pm.value, nickname, *message:
-                    if self.isLogged(user):
+                    if user.isLogged:
                         message = Message(sender=user.nickname, to=nickname, text=" ".join(message))
                         await self.pm(user, message)
                 case _:
@@ -88,19 +88,19 @@ class Server:
             return True
         return False
 
-    async def send(self, message: Message) -> None:
+    async def send(self, msg: Message) -> None:
         targets = list(np.concatenate(list(self.users.values())))
         for target in targets:
             message = Message(
-                sender=message.sender,
-                to=message.to,
-                text=message.text
+                sender=msg.sender,
+                to=msg.to,
+                text=msg.text
             )
             if message.to == "ALL" and target.nickname != message.sender:
                 target.send(message)
                 self.history.append(message)
             elif target.nickname == message.to:
-                message.sender = f"PM {message.sender}"
+                message.sender = f"PM {msg.sender}"
                 target.send(message)
 
     async def pm(self, user: User, message: Message):
