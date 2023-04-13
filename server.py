@@ -96,8 +96,9 @@ class Server:
                 to=msg.to,
                 text=msg.text
             )
-            if message.to == "ALL" and target.nickname != message.sender:
-                target.send(message)
+            if message.to == "ALL":
+                if target.nickname != message.sender:
+                    target.send(message)
                 self.history.append(message)
             elif target.nickname == message.to:
                 message.sender = f"PM {msg.sender}"
@@ -116,6 +117,11 @@ class Server:
             return
         await self.send(message)
 
+    async def load_history_for(self, user: User):
+        for message in self.history:
+            user.send(message)
+            await asyncio.sleep(0.1)
+
     async def login(self, user: User, nickname: str, password: str) -> None:
         compare_user = self.users.get(nickname, None)
         if compare_user is None or compare_user[0].password != password:
@@ -130,9 +136,7 @@ class Server:
             text=ColorFormatter("You have logged in", Colors.lightgreen)
         ))
         logger.debug(f"{user.nickname} logged in, sessions: {len(self.users.get(user.nickname))}")
-        for message in self.history:
-            user.send(message)
-            await asyncio.sleep(0.1)
+        await self.load_history_for(user)
 
     async def register(self, user: User, nickname: str, password: str) -> None:
         if nickname in self.users.keys():
@@ -148,21 +152,23 @@ class Server:
         user.isLogged = True
         self.users[nickname] = [user, ]
         logger.debug(f"User {user.nickname} registered")
+        await self.load_history_for(user)
 
     def stop(self) -> None:
         with open(BACKUP_FILENAME, "wb") as file:
-            # Выкидается ошибка
-            # AttributeError: Can't pickle local object 'WeakSet.__init__.<locals>._remove'
-            # Не могу разобраться, как ее фиксить, в интернете не удалось применить
-            # предложенные решения
+            for user_id in self.users:
+                for user in self.users[user_id]:
+                    user.reader = None
+                    user.writer = None
             pickle.dump(self.users, file, pickle.HIGHEST_PROTOCOL)
+            pickle.dump(self.history, file, pickle.HIGHEST_PROTOCOL)
         logger.debug("Server stopped, users and history saved")
 
     def load(self) -> None:
         try:
             with open(BACKUP_FILENAME, "rb") as f:
-                print(self.users)
                 self.users = pickle.load(f)
+                self.history = pickle.load(f)
         except FileNotFoundError:
             logger.debug("Dump file not found")
         else:
@@ -174,4 +180,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(server.start())
     except KeyboardInterrupt:
-        ...
+        server.stop()

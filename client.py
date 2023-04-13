@@ -49,4 +49,7 @@ class Client:
 
 
 if __name__ == "__main__":
-    asyncio.run(Client().connect())
+    try:
+        asyncio.run(Client().connect())
+    except:
+        ...
